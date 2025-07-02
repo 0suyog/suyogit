@@ -45,22 +45,22 @@ function read_blob(hash, arg) {
 		`.git/objects/${hash.slice(0, 2)}/${hash.slice(2)}`
 	);
 	let compressedData = fs.readFileSync(objectPath);
-	let enflated = zlib.unzipSync(compressedData);
-	let fileData = enflated.toString();
+	let unzippedFile = zlib.unzipSync(compressedData);
+	let fileData = unzippedFile.toString();
 	let header = fileData.split("\0")[0];
 	let length = header.length;
 	switch (arg) {
 		case "-p":
-			let content = fileData.slice(length+1);
-			console.log(content);
+			let content = fileData.slice(length + 1).trimEnd();
+			process.stdout.write(content);
 			break;
 		case "-s":
 			let size = header.split(" ")[1];
-			console.log(size);
+			process.stdout.write(size);
 			break;
 		case "-t":
 			let type = header.split(" ")[0];
-			console.log(type);
+			process.stdout.write(type);
 			break;
 		default:
 			throw new Error(`cat file doesn't recognize ${arg}`);
