@@ -51,7 +51,7 @@ function read_blob(hash, arg) {
 	let length = header.length;
 	switch (arg) {
 		case "-p":
-			let content = fileData.slice(length);
+			let content = fileData.slice(length+1);
 			console.log(content);
 			break;
 		case "-s":
