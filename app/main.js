@@ -44,7 +44,8 @@ switch (command) {
 	}
 	case "ls-tree": {
 		let hash = args.find((arg) => !arg.startsWith("-"));
-		ls_tree(hash);
+		let arg = args.find((arg) => arg.startsWith("--"));
+		process.stdout.write(ls_tree(hash, arg));
 		break;
 	}
 

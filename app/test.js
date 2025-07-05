@@ -7,7 +7,7 @@ const takeInput = () => {
 	});
 	process.stdin.on("end", () => {
 		console.log("end");
-		console.log(d);
+		console.log(0);
 	});
 };
 
