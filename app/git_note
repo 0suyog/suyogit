@@ -1,0 +1,19 @@
+Structure of Index file of .git
+- 12 Byte Header
+- Sorted Index Entries
+- Extension
+- HashCheckSum over the index file excluding this checksum
+
+# 12 byte is Header where 
+	first 4 byte: Signature
+	second 4 byte: version number
+	other 32 bits : number of entries
+#Sorted Index entries
+Index entries are sorted in ascending order. 
+Structure of each entry
+<32 bit ctime second><32 bit ctime nanoSeconds Fraction><32 bit mtime second><32bit mtime nanoSecods Fraction><32 bit device number><32 bit inode number><32 bit mode><32 bit uid><32 bit gid><32 bit filesize><16 bit flag>
+
+
+#Extensions
+	4 byte extension
+	32 bit size of extension

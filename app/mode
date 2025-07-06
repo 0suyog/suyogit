@@ -1,0 +1,8 @@
+Each file entry has a 32 bit mode. The mode is is split into high to low bits.
+first 4 bits store object type
+3 bits are unused so prolly 0
+9 bit store unix permission 0755 and  0644 are allowed for normal files.
+other left are just padding ie 0's
+31 30 29 28 | 27 26 25 | 24 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0 
+objecttype  | 0  0  0  | _____file permission______ | 0  0  0  0  0  0  0 0 0 0 0 0 0 0 0 0
+
