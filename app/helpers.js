@@ -2,14 +2,21 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 const zlib = require("node:zlib");
-const { off } = require("node:process");
 
-/*
-
-content of tree object
-tree size\0<fileEntries><fileEntry><fileEntry><fileEntry>
-fileEntries :100644 fileName.ext\0sha1Hash( 40 long hex)
-*/
+const entryPartByte = {
+	ctimeS: 4,
+	ctimeM: 4,
+	mtimeS: 4,
+	mtimeM: 4,
+	devNum: 4,
+	inode: 4,
+	mode: 4,
+	uid: 4,
+	gid: 4,
+	fileSize: 4,
+	hash: 20,
+	flag: 2,
+};
 
 const fileModesDictionary = {
 	"100644": "blob",
@@ -18,65 +25,126 @@ const fileModesDictionary = {
 	"040000": "tree",
 };
 
+
+
 function parse_index(content) {
-	let a = Buffer.from("");
-	let offset = 0;
-	let heading = content.subarray(0, 4);
-	offset = 4;
-	let versionNumber = content.subarray(offset, 8);
-	offset = 8;
-	let numberOfEntries = content.subarray(offset, 12);
-	offset = 12;
-	let ctimeSec = content.subarray(12, 16); // The last time files meta data changed
-	offset = 16;
-	let ctimeNanoSec = content.subarray(16, 20);
-	offset = 20;
-	let mtimeSec = content.subarray(20, 24);
-	offset = 24;
-	let mtimeNanoSec = content.subarray(24, 28);
-	offset = 28;
-	let deviceNumber = content.subarray(28, 32);
-	offset = 32;
-	let inodeNumber = content.subarray(32, 36);
-	offset = 36;
-	let mode = content.subarray(36, 40);
-	offset = 40;
-	let uid = content.subarray(40, 44);
-	offset = 44;
-	let gid = content.subarray(44, 48);
-	offset = 48;
-	let fileSize32Bit = content.subarray(48, 52);
-	offset = 52;
-	let flag = content.subarray(52, 54);
-	offset = 54;
-	console.log(`Version Number: ${Number(versionNumber.toString("hex"))}`);
-	console.log(`number of entreis: ${numberOfEntries.readUint32BE()}`);
-	console.log(`ctime in seconds: ${ctimeSec.readUint32BE()}`);
-	console.log(`ctime nanoSec fraction: ${ctimeNanoSec.readUint32BE()}`);
-	console.log(`mtime in seconds: ${mtimeSec.readUint32BE()}`);
-	console.log(`mtime nanoSec fraction: ${mtimeNanoSec.readUint32BE()}`);
-	console.log(`device number: ${deviceNumber.readUint32BE()}`);
-	console.log(`inodeNumber: ${inodeNumber.readUint32BE()}`);
-	console.log(`mode: ${mode.readUint32BE().toString(8)}`);
-	console.log(`uid: ${uid.readUint32BE()}`);
-	console.log(`gid: ${gid.readUint32BE()}`);
-	console.log(`fileSize: ${fileSize32Bit.readUint32BE()}`);
-	console.log(`flag: ${flag.toString("hex")}`);
-	parseFlag(flag);
+	let parsedData = {
+		entries: [],
+	};
+	let headerSignature = content.subarray(0, 4);
+	if (headerSignature.toString() !== "DIRC") {
+		throw new Error("Not a git index file");
+	}
+	parsedData.signature = headerSignature.toString();
+	let versionNumber = content.subarray(4, 8).readUint32BE();
+	if (versionNumber !== 2) {
+		throw new Error("Unsupported Version");
+	}
+	let checkSum = content.subarray(content.length - 20);
+	let dataForCheckSum = content.subarray(0, content.length - 20);
+	if (checkSum.toString() !== dataForCheckSum.toString("hex")) {
+		throw new Error("CheckSum didnt match");
+	}
+	let numberOfEntries = content.subarray(8, 12).readUint32BE();
+	let offset = 12;
+	let entry = {};
+	for (let i = 0; i < numberOfEntries; i++) {
+		entry = {};
+		let ctime = `${content
+			.subarray(offset, offset + entryPartByte.ctimeS)
+			.readUint32BE()}.${content
+			.subarray(offset + entryPartByte.ctimeM)
+			.readUint32BE()}`;
+		offset += entryPartByte.ctimeS + entryPartByte.ctimeM;
+		let mtime = `${content
+			.subarray(offset, offset + entryPartByte.mtimeS)
+			.readUint32BE()}.${content
+			.subarray(offset + entryPartByte.mtimeM)
+			.readUint32BE()}`;
+		offset += entryPartByte.mtimeS + entryPartByte.mtimeM;
+		let deviceNum = content
+			.subarray(offset, (offset += entryPartByte.devNum))
+			.readUint32BE();
+		let inodeNum = content
+			.subarray(offset, (offset += entryPartByte.inode))
+			.readUint32BE();
+		let mode = content
+			.subarray(offset, (offset += entryPartByte.mode))
+			.readUint32BE()
+			.toString(8);
+		let uid = content
+			.subarray(offset, (offset += entryPartByte.uid))
+			.readUint32BE();
+		let gid = content
+			.subarray(offset, (offset += entryPartByte.gid))
+			.readUint32BE();
+		let fileSize = content
+			.subarray(offset, (offset += entryPartByte.fileSize))
+			.readUint32BE();
+		let hash = content
+			.subarray(offset, (offset += entryPartByte.hash))
+			.toString("hex");
+		let flags = parseFlag(
+			content.subarray(offset, (offset += entryPartByte.flag))
+		);
+		// each entry length is 62 long upto flags then name is varialbe
+		let entryLength = 62;
+		let name = content
+			.subarray(offset, (offset += flags.nameLength))
+			.toString();
+		entryLength += flags.nameLength;
+		// offset += 1; // Index entries are always null terminated
+		entry = {
+			no: i + 1,
+			ctime,
+			mtime,
+			uid,
+			gid,
+			deviceNum,
+			inodeNum,
+			mode,
+			fileSize,
+			hash,
+			flags,
+			name,
+		};
+		parsedData.entries.push(entry);
+		let rem = entryLength % 8;
+		offset += 8 - rem || 8;
+	}
+	console.log(content.subarray(0, content.length - 20).toString("hex"));
+	console.log("\n____________");
+	let generatedCheckSum = crypto
+		.createHash("sha1")
+		.update(dataForCheckSum, false)
+		.digest();
+	console.log(
+		`is checksum equal to generatedCheckum?: ${
+			checkSum.toString("hex") === generatedCheckSum.toString("hex")
+		}`
+	);
+	// offset += 20;
+	return parsedData;
 }
 
 function parseFlag(flag) {
 	let num = flag.readUint16BE();
-	console.log(num & 0x0fff);
-	console.log(0x0fff);
+	let assumeValid = (num >>> 14) & 0b1;
+	let extendedFlag = (num >>> 13) & 0b1;
+	let twoBitStage = (num >>> 11) & 0b11;
+	let nameLength = num & 0xfff;
+	return {
+		assumeValid,
+		extendedFlag,
+		twoBitStage,
+		nameLength,
+	};
 }
 
-function readIndex() {
-	let content = fs.readFileSync("../.git/index");
+function ls_files() {
+	let content = fs.readFileSync("./.git/index");
 	parse_index(content);
 }
-
-readIndex();
 
 function ls_tree(hash, arg) {
 	let parsedTree = parseTreeHash(hash);
@@ -162,7 +230,7 @@ function hash_object(data, write) {
 		const compressedData = zlib.deflateSync(`${header}${data}`);
 		addObject(sha1, compressedData);
 	}
-	process.stdout(sha1);
+	return sha1;
 }
 
 function addObject(sha1, compressedData) {
@@ -187,7 +255,7 @@ function hash_object(data, write) {
 	if (write) {
 		addObject(sha1, compressedData);
 	}
-	console.log(sha1);
+	return sha1;
 }
 
 function cat_file(hash, arg) {
@@ -228,4 +296,4 @@ function read_blob(hash) {
 	return unzippedFile;
 }
 
-module.exports = { hash_object, cat_file, ls_tree };
+module.exports = { hash_object, cat_file, ls_tree, ls_files };

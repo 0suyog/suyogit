@@ -33,7 +33,7 @@ switch (command) {
 			});
 			process.stdin.on("end", () => {
 				if (data) {
-					hash_object(data, write);
+					process.stdout.write(hash_object(data, write));
 				}
 			});
 		} else {
