@@ -1,0 +1,125 @@
+{
+  "entries": [
+    {
+      "no": 1,
+      "entryStart": 12,
+      "ctime": "1751800849.398916660",
+      "mtime": "1751800849.6910492",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196147,
+      "mode": "100644",
+      "fileSize": 633,
+      "hash": "20b54f3f402206b2e2fb49def3016ddec2cb967e",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 8
+      },
+      "name": "git_note"
+    },
+    {
+      "no": 2,
+      "entryStart": 84,
+      "ctime": "1751997531.952062004",
+      "mtime": "1751997531.952062004",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196068,
+      "mode": "100644",
+      "fileSize": 7251,
+      "hash": "7d4a731ff1c33018f30b97dd4a6c329a06567b95",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 10
+      },
+      "name": "helpers.js"
+    },
+    {
+      "no": 3,
+      "entryStart": 164,
+      "ctime": "1751991706.542256016",
+      "mtime": "1751991706.542256016",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196046,
+      "mode": "100644",
+      "fileSize": 1967,
+      "hash": "0592ca8ef6289c1131d9173b07184b8a26d3e96f",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 7
+      },
+      "name": "main.js"
+    },
+    {
+      "no": 4,
+      "entryStart": 236,
+      "ctime": "1751800737.871158360",
+      "mtime": "1751800737.851427430",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196056,
+      "mode": "100644",
+      "fileSize": 434,
+      "hash": "fa4ea05da0fb5d3840260feaecc8da2c0e35be34",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 4
+      },
+      "name": "mode"
+    },
+    {
+      "no": 5,
+      "entryStart": 308,
+      "ctime": "1751991229.707709260",
+      "mtime": "1751991229.707709260",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196178,
+      "mode": "100644",
+      "fileSize": 18,
+      "hash": "d35811822c4c562da2236152089ca8eca728ce15",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 27
+      },
+      "name": "testFolder/insidetestfolder"
+    },
+    {
+      "no": 6,
+      "entryStart": 404,
+      "ctime": "1751991262.7199822",
+      "mtime": "1751991262.7199822",
+      "uid": 1000,
+      "gid": 1000,
+      "deviceNum": 2049,
+      "inodeNum": 58196179,
+      "mode": "100644",
+      "fileSize": 24,
+      "hash": "941703b92a86091e60dc8112445d85d047bdbb0d",
+      "flags": {
+        "assumeValid": 0,
+        "extendedFlag": 0,
+        "twoBitStage": 0,
+        "nameLength": 49
+      },
+      "name": "testFolder/nestedTestFolder/insidenestedtestfoler"
+    }
+  ],
+  "signature": "DIRC"
+}

@@ -2,6 +2,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 const zlib = require("node:zlib");
+const { chownSync, write } = require("node:fs");
 
 const entryPartByte = {
 	ctimeS: 4,
@@ -25,7 +26,56 @@ const fileModesDictionary = {
 	"040000": "tree",
 };
 
+function write_tree(path) {
+	let treeContent = "";
+	let directoryContents = fs.readdirSync(path).sort();
+	directoryContents.forEach((fileName) => {
+		console.log(fileName);
+		if (fileName === ".git") {
+			return;
+		}
+		let fileStatus = fs.statSync(`${path}/${fileName}`);
+		if (fileStatus.isFile()) {
+			let hash = hash_object(fs.readFileSync(`${path}/${fileName}`), true);
+			treeContent += `100644 ${fileName}\0${hash}`;
+		}
+		if (fileStatus.isDirectory()) {
+			let hash = write_tree(`${path}/${fileName}`);
+			treeContent += `040000 ${fileName}\0${hash}`;
+		}
+	});
+	let treeObjectContent = `tree ${treeContent.length}\0${treeContent}`;
+	let treeHash = crypto.createHash("sha1").update(treeObjectContent).digest();
+	return treeHash;
+}
 
+// write_tree(process.cwd());
+
+function update_index(hash, mode, fileName) {
+	let fileContent;
+	if (fs.existsSync(path.join(process.cwd(), ".git/index"))) {
+		fileContent = fs.readFileSync(path.join(process.cwd(), ".git/index"));
+	} else {
+		fileContent = Buffer.alloc(32);
+		fileContent.write("DIRC");
+		fileContent.writeInt32BE(2, 4);
+		fileContent.writeInt32BE(0, 8);
+		let sha = crypto.createHash("sha1").update(fileContent).digest();
+		sha.copy(fileContent, 12);
+	}
+	let parsedIndex = ls_files();
+	let previousEntry = parsedIndex.find((entry) => entry.name === fileName);
+	let position = fileContent.length - 20;
+	if (previousEntry) {
+		position = previousEntry.entryStart;
+	}
+	let dataAfterThisEntry = Buffer.from(
+		fileContent.subarray(previousEntry.entryEnd).toString()
+	);
+	let entry = Buffer.alloc(62 + fileName.length);
+}
+
+// update_index("dsf", "df", "d");
 
 function parse_index(content) {
 	let parsedData = {
@@ -42,13 +92,19 @@ function parse_index(content) {
 	}
 	let checkSum = content.subarray(content.length - 20);
 	let dataForCheckSum = content.subarray(0, content.length - 20);
-	if (checkSum.toString() !== dataForCheckSum.toString("hex")) {
-		throw new Error("CheckSum didnt match");
+	let generatedCheckSum = crypto
+		.createHash("sha1")
+		.update(dataForCheckSum)
+		.digest();
+	if (checkSum.toString("hex") !== generatedCheckSum.toString("hex")) {
+		throw new Error("CheckSum didn't match");
 	}
 	let numberOfEntries = content.subarray(8, 12).readUint32BE();
 	let offset = 12;
 	let entry = {};
+	let EntryStart = 0;
 	for (let i = 0; i < numberOfEntries; i++) {
+		let EntryStart = offset;
 		entry = {};
 		let ctime = `${content
 			.subarray(offset, offset + entryPartByte.ctimeS)
@@ -94,8 +150,12 @@ function parse_index(content) {
 			.toString();
 		entryLength += flags.nameLength;
 		// offset += 1; // Index entries are always null terminated
+		let rem = entryLength % 8;
+		offset += 8 - rem || 8;
 		entry = {
 			no: i + 1,
+			entryStart: EntryStart,
+			entryEnd: offset,
 			ctime,
 			mtime,
 			uid,
@@ -109,21 +169,24 @@ function parse_index(content) {
 			name,
 		};
 		parsedData.entries.push(entry);
-		let rem = entryLength % 8;
-		offset += 8 - rem || 8;
 	}
-	console.log(content.subarray(0, content.length - 20).toString("hex"));
-	console.log("\n____________");
-	let generatedCheckSum = crypto
-		.createHash("sha1")
-		.update(dataForCheckSum, false)
-		.digest();
-	console.log(
-		`is checksum equal to generatedCheckum?: ${
-			checkSum.toString("hex") === generatedCheckSum.toString("hex")
-		}`
-	);
-	// offset += 20;
+	// if (offset < content.length - 20) {
+	// 	console.log(`My file Pointer Position: ${offset}`);
+	// 	let extensions = {};
+	// 	let signature = content.subarray(offset, (offset += 4));
+	// 	extensions.signature = signature;
+	// 	let numberOfEntries = content.subarray(offset, (offset += 4));
+	// 	console.log(`number of entries: ${numberOfEntries.readUint32BE()}`);
+	// 	console.log(
+	// 		`hex content after nullbyte: ${content
+	// 			.subarray(offset - 8)
+	// 			.toString("ascii")}`
+	// 	);
+	// 	let nextNull = content.indexOf("\n", offset);
+	// 	console.log(
+	// 		`after next null${content.subarray(offset, nextNull).toString()}`
+	// 	);
+	// }
 	return parsedData;
 }
 
@@ -143,7 +206,7 @@ function parseFlag(flag) {
 
 function ls_files() {
 	let content = fs.readFileSync("./.git/index");
-	parse_index(content);
+	return parse_index(content);
 }
 
 function ls_tree(hash, arg) {
@@ -159,9 +222,9 @@ function ls_tree(hash, arg) {
 		case undefined: {
 			let returnValue = "";
 			for (let file of parsedTree) {
-				returnValue += `${file.mode} ${fileModesDictionary[file.mode]} ${
-					file.sha1
-				}    ${file.fileName}\n`;
+				returnValue += `${file.mode.toString().padStart(6, 0)} ${
+					fileModesDictionary[file.mode.toString().padStart(6, 0)]
+				} ${file.sha1}    ${file.fileName}\n`;
 			}
 			return returnValue;
 		}
@@ -214,6 +277,7 @@ function parseTreeHash(hash) {
 			tempEntry = {};
 		}
 	}
+	console.log(header);
 	return entries;
 }
 
@@ -296,4 +360,4 @@ function read_blob(hash) {
 	return unzippedFile;
 }
 
-module.exports = { hash_object, cat_file, ls_tree, ls_files };
+module.exports = { hash_object, cat_file, ls_tree, ls_files, write_tree };

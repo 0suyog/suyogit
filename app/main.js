@@ -1,6 +1,12 @@
 const fs = require("fs");
 const path = require("path");
-const { hash_object, ls_tree, cat_file } = require("./helpers.js");
+const {
+	hash_object,
+	ls_tree,
+	cat_file,
+	ls_files,
+	write_tree,
+} = require("./helpers.js");
 const readline = require("node:readline");
 const { copyFileSync, watch } = require("node:fs");
 // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -46,6 +52,14 @@ switch (command) {
 		let hash = args.find((arg) => !arg.startsWith("-"));
 		let arg = args.find((arg) => arg.startsWith("--"));
 		process.stdout.write(ls_tree(hash, arg));
+		break;
+	}
+	case "ls-files": {
+		process.stdout.write(JSON.stringify(ls_files(), undefined, 2));
+		break;
+	}
+	case "write-tree": {
+		process.stdout.write(write_tree(process.cwd()));
 		break;
 	}
 
