@@ -485,7 +485,7 @@ function read_blob(hash) {
 		process.cwd(),
 		".git",
 		"objects",
-		"${hash.slice(0, 2)}",
+		`${hash.slice(0, 2)}`,
 		`${hash.slice(2)}`
 	);
 	let compressedData = fs.readFileSync(objectPath);
