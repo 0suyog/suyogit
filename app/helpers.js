@@ -2,7 +2,6 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 const zlib = require("node:zlib");
-const { chownSync, write } = require("node:fs");
 
 const entryPartByte = {
 	ctimeS: 4,
@@ -26,35 +25,161 @@ const fileModesDictionary = {
 	"040000": "tree",
 };
 
+function update_ref(refPath, commitHash) {
+	if (cat_file(commitHash, "-t") !== "commit") {
+		throw new Error("The provided commitHash isnt a valid commit");
+	}
+	let dirPath = path.dirname(refPath);
+	if (!fs.existsSync(dirPath)) {
+		fs.mkdirSync(dirPath, { recursive: true });
+	}
+	fs.writeFileSync(refPath, commitHash);
+}
+
+function commit_tree(tree, message, ...parents) {
+	if (!tree) {
+		throw new Error("Tree is required for a commit");
+	}
+	if (!message) {
+		throw new Error("Message is required");
+	}
+	if (!cat_file(tree, "-t") === "tree") {
+		throw new Error("Not valid Tree");
+	}
+	let parentString = "";
+	parents.forEach((parent) => {
+		if (!cat_file(parent, "-t") === "commit") {
+			throw new Error("parent isnt a valid commit");
+		}
+		parentString += `parent ${parent}\n`;
+	});
+	let name = getConfig("user", "name");
+	let email = getConfig("user", "email");
+	let timeInSecond = Math.floor(Date.now() / 1000);
+	const offset = new Date().getTimezoneOffset();
+	const hours = Math.floor(Math.abs(offset) / 60)
+		.toString()
+		.padStart(2, 0);
+	const minutes = (Math.abs(offset) % 60).toString().padStart(2, 0);
+	const sign = offset <= 0 ? "+" : "-";
+	let timeZoneOffset = `${sign}${hours}${minutes}`;
+	let contentToWrite = `tree ${tree}\n${parentString}author ${name} <${email}> ${timeInSecond} ${timeZoneOffset}\ncommitter ${name} <${email}> ${timeInSecond} ${timeZoneOffset}\n\n${message}`;
+	return hash_object("commit", contentToWrite, true).toString("hex");
+}
+
+// sample config
+/*
+[user] //block
+	name = meow //key = value
+	email = meow@mail.com
+*/
+
+function getConfig(block, key) {
+	let filePath = path.join(process.cwd(), ".git", "config");
+	let fileContent = fs.readFileSync(filePath).toString();
+	let blockIndex = fileContent.indexOf(`[${block}]`);
+	if (blockIndex == -1) {
+		throw new Error(`${block} ${key} doesn't exist`);
+	}
+	let keyIndex = fileContent.indexOf(`${key}`);
+	if (keyIndex === -1) {
+		throw new Error(` ${key} doesnt exist`);
+	}
+	let equalSignIndex = fileContent.indexOf("=", keyIndex);
+	let lineBreakIndex = fileContent.indexOf("\n", equalSignIndex);
+	let value = fileContent.slice(equalSignIndex + 2, lineBreakIndex);
+	return value;
+}
+
+function setConfig(block, key, value) {
+	let filePath = path.join(process.cwd(), ".git", "config");
+	let fileContent = fs.readFileSync(filePath);
+	let blockIndex = fileContent.indexOf(Buffer.from(`[${block}]`));
+	if (!fileContent.length) {
+		let contentToWrite = Buffer.from(`[${block}]\n\t${key} = ${value}`);
+		fs.appendFileSync(filePath, contentToWrite);
+		return;
+	}
+	// if block isnt initialized
+	if (blockIndex === -1) {
+		let contentToWrite = Buffer.from(`\n[${block}]\n\t${key} = ${value}`);
+		fs.appendFileSync(filePath, contentToWrite);
+		return;
+	}
+	let keyIndex = fileContent.indexOf(Buffer.from(`\n\t${key} = `));
+	// if key doesntExist
+	if (keyIndex === -1) {
+		let nextBlockIndex = fileContent.indexOf(Buffer.from("["), blockIndex + 1);
+		// if nextBlock doent exist
+		if (nextBlockIndex !== -1) {
+			console.log(
+				`fileContent cropped to nextBlockIndex${fileContent
+					.subarray(0, nextBlockIndex)
+					.toString()}`
+			);
+			let contentToWrite = Buffer.concat([
+				fileContent.subarray(0, nextBlockIndex),
+				Buffer.from(`\t${key} = ${value}\n`),
+				fileContent.subarray(nextBlockIndex),
+			]);
+			fs.writeFileSync(filePath, contentToWrite);
+			return;
+		}
+		let contentToWrite = Buffer.concat([
+			fileContent.subarray(0),
+			Buffer.from(`\n\t${key} = ${value}`),
+		]);
+		fs.writeFileSync(filePath, contentToWrite);
+		return;
+	}
+	let contentToWrite = Buffer.concat([
+		fileContent.subarray(0, keyIndex),
+		Buffer.from(`\n\t${key} = ${value}`),
+	]);
+	fs.writeFileSync(filePath, contentToWrite);
+	return;
+}
+
 function write_tree(path) {
-	let treeContent = "";
+	// let treeContent = "";
 	let directoryContents = fs.readdirSync(path).sort();
+	let buffers = [];
+	if (!directoryContents.length) {
+		return;
+	}
 	directoryContents.forEach((fileName) => {
-		console.log(fileName);
 		if (fileName === ".git") {
 			return;
 		}
-		let fileStatus = fs.statSync(`${path}/${fileName}`);
+		let fileStatus = fs.statSync(path.join(path, fileName));
 		if (fileStatus.isFile()) {
-			let hash = hash_object(fs.readFileSync(`${path}/${fileName}`), true);
-			treeContent += `100644 ${fileName}\0${hash}`;
+			let hash = hash_object(
+				"blob",
+				fs.readFileSync(path.join(path, fileName)),
+				true
+			);
+			buffers.push(Buffer.concat([Buffer.from(`100644 ${fileName}\0`), hash]));
 		}
 		if (fileStatus.isDirectory()) {
-			let hash = write_tree(`${path}/${fileName}`);
-			treeContent += `040000 ${fileName}\0${hash}`;
+			let hash = write_tree(path.join(path, fileName));
+			if (hash) {
+				buffers.push(Buffer.concat([Buffer.from(`40000 ${fileName}\0`), hash]));
+			}
 		}
 	});
-	let treeObjectContent = `tree ${treeContent.length}\0${treeContent}`;
-	let treeHash = crypto.createHash("sha1").update(treeObjectContent).digest();
+	let contentBuffer = Buffer.concat(buffers);
+	let headerBuffer = Buffer.from(`tree ${contentBuffer.byteLength}\0`);
+	let treeBuffer = Buffer.concat([headerBuffer, contentBuffer]);
+	let treeHash = crypto.createHash("sha1").update(treeBuffer).digest();
+	const compressedData = zlib.deflateSync(treeBuffer);
+	addObject(treeHash.toString("hex"), compressedData);
 	return treeHash;
 }
-
-// write_tree(process.cwd());
-
+// Function to update index to add file to index
 function update_index(hash, mode, fileName) {
 	let fileContent;
-	if (fs.existsSync(path.join(process.cwd(), ".git/index"))) {
-		fileContent = fs.readFileSync(path.join(process.cwd(), ".git/index"));
+	if (fs.existsSync(path.join(process.cwd(), ".git", "index"))) {
+		fileContent = fs.readFileSync(path.join(process.cwd(), ".git", "index"));
 	} else {
 		fileContent = Buffer.alloc(32);
 		fileContent.write("DIRC");
@@ -170,6 +295,7 @@ function parse_index(content) {
 		};
 		parsedData.entries.push(entry);
 	}
+	// Havent figured out extension yet
 	// if (offset < content.length - 20) {
 	// 	console.log(`My file Pointer Position: ${offset}`);
 	// 	let extensions = {};
@@ -204,8 +330,14 @@ function parseFlag(flag) {
 	};
 }
 
-function ls_files() {
-	let content = fs.readFileSync("./.git/index");
+function ls_files(indexPath) {
+	let content;
+	if (indexPath) {
+		content = fs.readFileSync(indexPath);
+	}
+	if (!content) {
+		content = fs.readFileSync("./.git/index");
+	}
 	return parse_index(content);
 }
 
@@ -277,50 +409,48 @@ function parseTreeHash(hash) {
 			tempEntry = {};
 		}
 	}
-	console.log(header);
 	return entries;
 }
 
-function hash_object(data, write) {
-	let type = "blob";
+function hash_object(type, data, write) {
 	let buffer = Buffer.from(data);
 	let size = Buffer.byteLength(buffer);
 	const header = `${type} ${size}\0`;
-	const sha1 = crypto
-		.createHash("sha1")
-		.update(`${header}${data}`)
-		.digest("hex");
+	const sha1 = crypto.createHash("sha1").update(`${header}${data}`).digest();
 	if (write) {
 		const compressedData = zlib.deflateSync(`${header}${data}`);
-		addObject(sha1, compressedData);
+		addObject(sha1.toString("hex"), compressedData);
 	}
+	// console.log(sha1);
 	return sha1;
 }
 
 function addObject(sha1, compressedData) {
 	const objectPath = path.join(
 		process.cwd(),
-		`.git/objects/${sha1.slice(0, 2)}/`
+		".git",
+		"objects",
+		`${sha1.slice(0, 2)}/`
 	);
 	fs.mkdirSync(objectPath, { recursive: true });
 	fs.writeFileSync(path.join(objectPath, sha1.slice(2)), compressedData);
 }
 
-function hash_object(data, write) {
-	let type = "blob";
-	let buffer = Buffer.from(data);
-	let size = Buffer.byteLength(buffer, "ascii");
-	const header = `${type} ${size}\0`;
-	const sha1 = crypto
-		.createHash("sha1")
-		.update(`${header}${data}`)
-		.digest("hex");
-	const compressedData = zlib.deflateSync(`${header}${data}`);
-	if (write) {
-		addObject(sha1, compressedData);
-	}
-	return sha1;
-}
+// function hash_object(data, write) {
+// 	let type = "blob";
+// 	let buffer = Buffer.from(data);
+// 	let size = Buffer.byteLength(buffer, "ascii");
+// 	const header = `${type} ${size}\0`;
+// 	const sha1 = crypto
+// 		.createHash("sha1")
+// 		.update(`${header}${data}`)
+// 		.digest("hex");
+// 	const compressedData = zlib.deflateSync(`${header}${data}`);
+// 	if (write) {
+// 		addObject(sha1, compressedData);
+// 	}
+// 	return sha1;
+// }
 
 function cat_file(hash, arg) {
 	if (!hash) {
@@ -353,11 +483,23 @@ function cat_file(hash, arg) {
 function read_blob(hash) {
 	const objectPath = path.join(
 		process.cwd(),
-		`.git/objects/${hash.slice(0, 2)}/${hash.slice(2)}`
+		".git",
+		"objects",
+		"${hash.slice(0, 2)}",
+		`${hash.slice(2)}`
 	);
 	let compressedData = fs.readFileSync(objectPath);
 	let unzippedFile = zlib.unzipSync(compressedData);
 	return unzippedFile;
 }
 
-module.exports = { hash_object, cat_file, ls_tree, ls_files, write_tree };
+module.exports = {
+	hash_object,
+	cat_file,
+	ls_tree,
+	ls_files,
+	write_tree,
+	setConfig,
+	commit_tree,
+	update_ref,
+};

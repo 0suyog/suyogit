@@ -6,6 +6,9 @@ const {
 	cat_file,
 	ls_files,
 	write_tree,
+	setConfig,
+	commit_tree,
+	update_ref,
 } = require("./helpers.js");
 const readline = require("node:readline");
 const { copyFileSync, watch } = require("node:fs");
@@ -39,7 +42,9 @@ switch (command) {
 			});
 			process.stdin.on("end", () => {
 				if (data) {
-					process.stdout.write(hash_object(data, write));
+					process.stdout.write(
+						hash_object("blob", data, write).toString("hex")
+					);
 				}
 			});
 		} else {
@@ -55,11 +60,45 @@ switch (command) {
 		break;
 	}
 	case "ls-files": {
-		process.stdout.write(JSON.stringify(ls_files(), undefined, 2));
+		let indexPath = args[0];
+		process.stdout.write(JSON.stringify(ls_files(indexPath), undefined, 2));
 		break;
 	}
 	case "write-tree": {
-		process.stdout.write(write_tree(process.cwd()));
+		process.stdout.write(write_tree(process.cwd()).toString("hex"));
+		break;
+	}
+	case "config": {
+		let block_key = args[0];
+		let value = args[1];
+		let [block, key] = block_key.split(".");
+		setConfig(block, key, value);
+		break;
+	}
+	case "commit-tree": {
+		let tree = args[0];
+		let message = "";
+		let parents = [];
+
+		let i = 1;
+		while (i < args.length) {
+			if (args[i] == "-p") {
+				parents.push(args[i + 1]);
+			} else if (args[i] == "-m") {
+				message = args[i + 1];
+			}
+			i++;
+		}
+		process.stdout.write(commit_tree(tree, message, ...parents));
+		break;
+	}
+	case "update-ref": {
+		let branchName = args[0];
+		let hash = args[1];
+		update_ref(
+			path.join(process.cwd(), ".git", "refs", "heads", branchName),
+			hash
+		);
 		break;
 	}
 
@@ -77,5 +116,6 @@ function createGitDirectory() {
 		path.join(process.cwd(), ".git", "HEAD"),
 		"ref: refs/heads/main\n"
 	);
+	fs.writeFileSync(path.join(process.cwd(), ".git", "config"), "");
 	console.log("Initialized git directory");
 }
