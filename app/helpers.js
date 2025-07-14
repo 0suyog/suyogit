@@ -140,9 +140,9 @@ function setConfig(block, key, value) {
 	return;
 }
 
-function write_tree(path) {
+function write_tree(workingDirPath) {
 	// let treeContent = "";
-	let directoryContents = fs.readdirSync(path).sort();
+	let directoryContents = fs.readdirSync(workingDirPath).sort();
 	let buffers = [];
 	if (!directoryContents.length) {
 		return;
@@ -151,17 +151,17 @@ function write_tree(path) {
 		if (fileName === ".git") {
 			return;
 		}
-		let fileStatus = fs.statSync(path.join(path, fileName));
+		let fileStatus = fs.statSync(path.join(workingDirPath, fileName));
 		if (fileStatus.isFile()) {
 			let hash = hash_object(
 				"blob",
-				fs.readFileSync(path.join(path, fileName)),
+				fs.readFileSync(path.join(workingDirPath, fileName)),
 				true
 			);
 			buffers.push(Buffer.concat([Buffer.from(`100644 ${fileName}\0`), hash]));
 		}
 		if (fileStatus.isDirectory()) {
-			let hash = write_tree(path.join(path, fileName));
+			let hash = write_tree(path.join(workingDirPath, fileName));
 			if (hash) {
 				buffers.push(Buffer.concat([Buffer.from(`40000 ${fileName}\0`), hash]));
 			}
