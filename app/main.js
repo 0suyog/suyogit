@@ -10,12 +10,6 @@ const {
 	commit_tree,
 	update_ref,
 } = require("./helpers.js");
-const readline = require("node:readline");
-const { copyFileSync, watch } = require("node:fs");
-// You can use print statements as follows for debugging, they'll be visible when running tests.
-console.error("Logs from your program will appear here!");
-
-// Uncomment this block to pass the first stage
 const command = process.argv[2];
 const args = process.argv.slice(3);
 
