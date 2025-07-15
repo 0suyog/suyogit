@@ -43,9 +43,9 @@ These are the commands recognized by the program. They should be used after node
 
 - `hash-object [flag] [data/filePath]`
 
-	- `--stdin`: Prompts user for input and returns the SHA-1 hash of the data (like Git does).
+	`--stdin`: Prompts user for input and returns the SHA-1 hash of the data (like Git does).
 
-	- `-w`: Saves the object to .git/objects.
+	 `-w`: Saves the object to .git/objects.
 
 	You should pass a file path if not using `--stdin`.
 
@@ -63,10 +63,10 @@ These are the commands recognized by the program. They should be used after node
 
 	No flag: Displays filenames along with metadata.
 
-	- `ls-files [?pathToIndex]`
+- `ls-files [?pathToIndex]`
 	Parses the index file at the given path. If no path is given, defaults to .git/index in the current directory.
 
-	`write-tree`
+- `write-tree`
 	Creates a tree from the current directory's files (excluding .git). Automatically hashes untracked files.
 
 - `config {block.key value}`
