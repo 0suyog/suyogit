@@ -8,7 +8,7 @@ git commit -m "generic commit message"
 # Motivation
 
 I wanted to understand how Git works under the hood. It was always a mystery to me how a simple git add . and git commit -m "commit message" makes it so resilient — almost impossible to lose a file. To uncover the magic, I read the  [Progit](https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain) book and then began implementing my own version of Git (at least some of the plumbing commands).
-Usage
+# Usage
 
     Note: You don’t need to write the curly braces in the commands.
 ``` bash
