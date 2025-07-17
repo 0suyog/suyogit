@@ -1,6 +1,6 @@
 # Suyogit
 
-An implementation of Git in TypeScript. This project aims to provide basic plumbing commands of Git, allowing you to create your own commits by walking through the internal processes that happen when you run something like:
+An implementation of Git in Javascript. This project aims to provide basic plumbing commands of Git, allowing you to create your own commits by walking through the internal processes that happen when you run something like:
 ``` bash
 git commit -m "generic commit message"
 ```
